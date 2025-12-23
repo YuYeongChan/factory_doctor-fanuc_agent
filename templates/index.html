@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>팩토리 닥터 - FANUC 오류 가이드</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 900px;
+      margin: 32px auto;
+      padding: 0 16px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 8px 10px;
+      margin-top: 4px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    button {
+      margin-top: 16px;
+      padding: 10px 18px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .result-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .field-label {
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .danger {
+      color: #b91c1c;
+      font-weight: 700;
+      white-space: pre-line;
+    }
+    .steps {
+      margin-top: 4px;
+      padding-left: 20px;
+    }
+    .steps li {
+      margin-bottom: 4px;
+    }
+    .manual-block {
+      margin-top: 12px;
+      padding: 8px 10px;
+      background: #f9fafb;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-line;
+    }
+    .error-message {
+      color: #b91c1c;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>FANUC 설비 고장 대응 가이드 (팩토리 닥터)</h1>
+
+  <div class="card">
+    <label for="error_code">오류 코드 (예: SRVO-062)</label>
+    <input id="error_code" type="text" placeholder="SRVO-062" />
+
+    <label for="description">상세 설명 / 상황 (선택)</label>
+    <textarea id="description" placeholder="예: BZAL 배터리 이상, 라인 정지 상황 등"></textarea>
+
+    <button id="submitBtn">가이드 조회</button>
+    <div id="errorText" class="error-message"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="result-title">진단 결과</div>
+
+    <div class="field-label">오류 코드</div>
+    <div id="resultErrorCode"></div>
+
+    <div class="field-label">주요 요인</div>
+    <div id="resultTitleKo"></div>
+
+    <div class="field-label">요약</div>
+    <div id="resultSummaryKo"></div>
+
+    <div class="field-label">주의사항</div>
+    <div id="resultSafetyKo" class="danger"></div>
+
+    <div class="field-label">수리 절차</div>
+    <ol id="resultSteps" class="steps"></ol>
+
+    <div class="field-label">원문 매뉴얼 (영문)</div>
+    <div class="manual-block" id="resultManual"></div>
+  </div>
+
+  <script>
+    const btn = document.getElementById("submitBtn");
+    const errorCodeInput = document.getElementById("error_code");
+    const descInput = document.getElementById("description");
+    const errorText = document.getElementById("errorText");
+
+    const resultCard = document.getElementById("resultCard");
+    const resultErrorCode = document.getElementById("resultErrorCode");
+    const resultTitleKo = document.getElementById("resultTitleKo");
+    const resultSummaryKo = document.getElementById("resultSummaryKo");
+    const resultSafetyKo = document.getElementById("resultSafetyKo");
+    const resultSteps = document.getElementById("resultSteps");
+    const resultManual = document.getElementById("resultManual");
+
+    btn.addEventListener("click", async () => {
+      const errorCode = errorCodeInput.value.trim();
+      const description = descInput.value.trim();
+
+      errorText.textContent = "";
+      resultCard.style.display = "none";
+
+      if (!errorCode) {
+        errorText.textContent = "오류 코드를 입력해 주세요. (예: SRVO-062)";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "조회 중...";
+
+      try {
+        const response = await fetch("/diagnose", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            error_code: errorCode,
+            description: description || null,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("서버 오류: " + response.status);
+        }
+
+        const data = await response.json();
+        console.log("API 응답:", data);
+
+        // guide 부분
+        const guide = data.guide || {};
+        const manual = data.manual || {};
+
+        resultErrorCode.textContent = guide.error_code || data.error_code || errorCode;
+        resultTitleKo.textContent = guide.title_ko || "-";
+        resultSummaryKo.textContent = guide.summary_ko || "-";
+        resultSafetyKo.textContent = guide.safety_ko || "주의 사항 정보 없음";
+
+        // steps_ko는 배열인데, 안에 한 줄로 들어있을 수 있으니 \n 기준으로 다시 분리
+        resultSteps.innerHTML = "";
+        let stepsRaw = guide.steps_ko;
+        let stepLines = [];
+
+        if (Array.isArray(stepsRaw)) {
+          for (const s of stepsRaw) {
+            if (typeof s === "string") {
+              // \n 또는 \\n 모두 대응
+              const parts = s.split(/\\n|\r?\n/g);
+              for (const p of parts) {
+                const trimmed = p.trim();
+                if (trimmed) stepLines.push(trimmed);
+              }
+            }
+          }
+        } else if (typeof stepsRaw === "string") {
+        // 혹시 나중에 steps_ko가 그냥 문자열로 오더라도 대응
+            const parts = stepsRaw.split(/\\n|\r?\n/g);
+            for (const p of parts) {
+                const trimmed = p.trim();
+                if (trimmed) stepLines.push(trimmed);
+            }
+        }
+
+
+        if (stepLines.length === 0) {
+          // 아무 것도 없으면 fallback
+          stepLines.push("수리 절차 정보가 없습니다.");
+        }
+
+        stepLines.forEach((line) => {
+          const cleaned = line.replace(/\([^)]*\$[^)]*\)/g, "").trim();
+
+          const li = document.createElement("li");
+          li.textContent = cleaned || line;
+          resultSteps.appendChild(li);
+        });
+
+        // 매뉴얼 원문(영문)도 같이 보여주기 (옵션)
+        const safetyManual = manual.safety_manual || [];
+        const troubleshootingManual = manual.troubleshooting_manual || [];
+
+        const manualTexts = [];
+        if (safetyManual.length > 0) {
+          manualTexts.push("[SAFETY]\n" + safetyManual.join("\n"));
+        }
+        if (troubleshootingManual.length > 0) {
+          manualTexts.push("[TROUBLESHOOTING]\n" + troubleshootingManual.join("\n"));
+        }
+
+        resultManual.textContent = manualTexts.join("\n\n") || "매뉴얼 원문 정보 없음";
+
+        resultCard.style.display = "block";
+      } catch (err) {
+        console.error(err);
+        errorText.textContent = "가이드를 불러오는 중 오류가 발생했습니다.";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "가이드 조회";
+      }
+    });
+  </script>
+</body>
+</html>
