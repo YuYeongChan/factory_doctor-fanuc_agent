@@ -57,7 +57,8 @@ flowchart LR
   I --> K[RAG 검색<br/>(manual_chunks_local)]
   J --> L[응답 JSON 결합]
   K --> L
-  L --> M[index.html에 결과 출력]```
+  L --> M[index.html에 결과 출력]
+```
 
 ---
 
