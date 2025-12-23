@@ -94,8 +94,6 @@ flowchart LR
 ### Backend
 - **Python**
 - **FastAPI**
-
-> *(프로젝트 코드 기준으로 아래 항목도 함께 사용됩니다.)*
 - **Pydantic**: 요청 바디(JSON) 스키마/검증
 - **Jinja2 Templates**: `index.html` 템플릿 서빙
 
