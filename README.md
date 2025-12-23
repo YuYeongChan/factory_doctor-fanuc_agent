@@ -45,19 +45,19 @@ FANUC 로봇(컨트롤러) 매뉴얼 기반으로 **설비 오류코드 진단 +
 
 ```mermaid
 flowchart LR
-  A[PDF 매뉴얼] --> B[pdfplumber로 텍스트 추출]
-  B --> C[SRVO-xxx 기준 블록 분리/정제]
-  C --> D[manual_chunks_auto.csv 생성]
-  D --> E[PostgreSQL 적재 (manual_chunks_local)]
-  E --> F[임베딩 생성<br/>(all-MiniLM-L6-v2 / 384d)]
-  F --> G[pgvector 저장 및 검색 준비]
+  A["PDF 매뉴얼"] --> B["pdfplumber 텍스트 추출"]
+  B --> C["SRVO-xxx 블록 분리/정제"]
+  C --> D["manual_chunks_auto.csv 생성"]
+  D --> E["PostgreSQL 적재<br/>manual_chunks_local"]
+  E --> F["임베딩 생성<br/>all-MiniLM-L6-v2 (384d)"]
+  F --> G["pgvector 저장 및 검색 준비"]
 
-  H["사용자 입력<br/>(오류코드 + 상황설명)"] --> I[/diagnose API (FastAPI)]
-  I --> J[한글 가이드 조회<br/>(error_guides_ko)]
-  I --> K[RAG 검색<br/>(manual_chunks_local)]
-  J --> L[응답 JSON 결합]
+  H["사용자 입력<br/>오류코드 + 상황설명"] --> I["API: diagnose (FastAPI)"]
+  I --> J["한글 가이드 조회<br/>error_guides_ko"]
+  I --> K["RAG 검색<br/>manual_chunks_local"]
+  J --> L["응답 JSON 결합"]
   K --> L
-  L --> M[index.html에 결과 출력]
+  L --> M["index.html 결과 출력"]
 ```
 
 ---
